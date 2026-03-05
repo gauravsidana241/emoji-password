@@ -150,14 +150,8 @@ function EmojiLogin() {
   const [sequence, setSequence] = useState<string[]>([]);
   const [emojiPool, setEmojiPool] = useState<any[]>([...shuffleArray(EMOJI_POOL)]);
   const [result, setResult] = useState<null | "success" | "fail">(null);
-  const [shuffle, setShuffle] = useState<boolean>(false);
   const [showStrenghts, setShowStrenghts] = useState(false);
   const PASSCODE_LEN = 4;
-
-  useEffect(() => {
-    shuffleArray(EMOJI_POOL);
-    setShuffle(false);
-  }, [shuffle]);
 
   const handleSubmit = () => {
     const expected = EMOJI_USERS[username.toLowerCase()];
