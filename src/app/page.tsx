@@ -133,7 +133,7 @@ function PasscodePanel({ title, accent, renderPad, registered, setRegistered, on
       {/* Description */}
       <p className="panelDesc">
         {step === "register"
-          ? "Build your passcode — any length. It stays hidden, so remember it well."
+          ? "Build your passcode: any length. It stays hidden, so remember it well."
           : "Re-enter your passcode exactly as you set it."}
       </p>
 
