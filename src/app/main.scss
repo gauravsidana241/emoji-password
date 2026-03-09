@@ -1,18 +1,36 @@
 // ─── Tokens ───────────────────────────────────────────────────────────────────
-$bg:       #111111;
-$surface:  #1a1a1a;
-$surface2: #222222;
-$border:   #2e2e2e;
-$success:  #4caf7d;
-$fail:     #c0524f;
-$text:     #e8e8e8;
-$muted:    #777777;
-$font-display: "Montserrat", sans-serif;
-$font-body:    "Inter", sans-serif;
+$bg:       #f5f4f0;
+$surface:  #ffffff;
+$surface2: #f0efe9;
+$border:   #e2e0d8;
+$border2:  #cccac0;
+$success:  #16a34a;
+$fail:     #dc2626;
+$text:     #1a1a1a;
+$muted:    #7a7870;
+$muted2:   #b0ada6;
 
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Montserrat:wght@500;600;700&display=swap");
+/* 1. Update the Google Fonts Import */
+@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Instrument+Serif&display=swap");
+
+/* 2. Update the Variables */
+$font-display: "Instrument Serif", "Georgia", serif;
+$font-body:    "DM Sans", sans-serif;
+$font-mono:    "DM Mono", monospace;
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body { background: $bg; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes popIn {
+  from { transform: scale(0.7); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
 
 // ─── Page shell ───────────────────────────────────────────────────────────────
 .main {
@@ -24,363 +42,315 @@ $font-body:    "Inter", sans-serif;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1.5rem 1rem 2rem;
+  padding: 2rem 1rem 3rem;
+}
+
+// ─── Hero ─────────────────────────────────────────────────────────────────────
+.hero {
+  text-align: center;
+  margin-bottom: 2rem;
+  animation: fadeUp 0.3s ease both;
+}
+
+.heroPill {
+  display: inline-block;
+  background: $surface;
+  border: 1px solid $border;
+  border-radius: 20px;
+  padding: 0.2rem 0.9rem;
+  font-family: $font-mono;
+  font-size: 0.62rem;
+  color: $muted;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 0.75rem;
+}
+
+.heroTitle {
+  font-family: $font-display;
+  font-size: 2rem;
+  font-weight: 400;
+  color: $text;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.heroSub {
+  margin-top: 0.4rem;
+  font-size: 0.82rem;
+  color: $muted;
+  letter-spacing: 0.02em;
 }
 
 // ─── Tab bar ──────────────────────────────────────────────────────────────────
 .tabBar {
   display: flex;
-  border: 1px solid $border;
-  border-radius: 8px;
-  padding: 0.2rem;
-  margin-bottom: 1.25rem;
-  background: $surface;
-  flex-shrink: 0;
   width: 100%;
-  max-width: 480px;
+  max-width: 460px;
+  border-bottom: 1px solid $border;
+  margin-bottom: 1.5rem;
+  gap: 0;
 }
 
 .tab {
   flex: 1;
-  padding: 0.45rem 1rem;
-  border-radius: 6px;
+  padding: 0.6rem 0.5rem;
   border: none;
+  border-bottom: 2px solid transparent;
   background: transparent;
   color: $muted;
   font-family: $font-body;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 500;
   cursor: pointer;
-  transition: color 0.15s, background 0.15s;
-  letter-spacing: 0.02em;
+  transition: color 0.15s, border-bottom-color 0.15s;
+  letter-spacing: 0.01em;
+  margin-bottom: -1px;
 
-  &:hover { color: $text; background: $surface2; }
+  &:hover:not(.tabActive) { color: $text; }
 }
 
 .tabActive {
-  background: $surface2 !important;
-  color: $text !important;
   font-weight: 600;
-  border: 1px solid $border;
+  // color + border-bottom set inline via accent
 }
 
 // ─── Tab body ─────────────────────────────────────────────────────────────────
 .tabBody {
   width: 100%;
-  max-width: 480px;
-}
-
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-// ─── Single column layout ─────────────────────────────────────────────────────
-.twoCol {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  max-width: 460px;
   animation: fadeUp 0.2s ease both;
 }
 
-// ─── Login card ───────────────────────────────────────────────────────────────
-.loginCard {
+// ─── Panel card ───────────────────────────────────────────────────────────────
+.panel {
   background: $surface;
   border: 1px solid $border;
-  border-radius: 10px;
-  padding: 1.1rem;
+  border-top: 3px solid;           // accent colour set inline
+  border-radius: 14px;
+  padding: 1.4rem 1.3rem;
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
+  gap: 1rem;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
 }
 
-.cardTitle {
-  font-family: $font-display;
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: $text;
-}
-
-.cardSub {
-  font-size: 0.78rem;
-  color: $muted;
-  line-height: 1.5;
-
-  code {
-    color: #bbb;
-    background: $surface2;
-    padding: 0.1em 0.4em;
-    border-radius: 3px;
-    font-family: "Courier New", monospace;
-    font-size: 0.78rem;
-    border: 1px solid $border;
-  }
-}
-
-// ─── Form fields ──────────────────────────────────────────────────────────────
-.field {
+.panelHeader {
   display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.label {
-  font-size: 0.68rem;
-  font-weight: 500;
-  color: $muted;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.input {
-  background: $surface2;
-  border: 1px solid $border;
-  border-radius: 6px;
-  padding: 0.55rem 0.85rem;
-  color: $text;
-  font-family: $font-body;
-  font-size: 0.88rem;
-  outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
-  width: 100%;
-
-  &::placeholder { color: #444; }
-  &:focus {
-    border-color: #555;
-    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.04);
-  }
-}
-
-// ─── Buttons ──────────────────────────────────────────────────────────────────
-.submitBtn {
-  padding: 0.55rem 1.25rem;
-  background: #2e2e2e;
-  color: $text;
-  border: 1px solid #3e3e3e;
-  border-radius: 6px;
-  font-family: $font-body;
-  font-size: 0.85rem;
-  font-weight: 500;
-  cursor: pointer;
-  letter-spacing: 0.02em;
-  transition: background 0.15s, border-color 0.15s;
-
-  &:hover:not(:disabled) { background: #383838; border-color: #505050; }
-  &:active:not(:disabled) { background: #2a2a2a; }
-  &:disabled { opacity: 0.35; cursor: not-allowed; }
-}
-
-.resetBtn {
-  padding: 0.55rem 1.25rem;
-  background: transparent;
-  color: $muted;
-  border: 1px solid $border;
-  border-radius: 6px;
-  font-family: $font-body;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-
-  &:hover { color: $text; border-color: #555; }
-}
-
-.emojiActions {
-  display: flex;
-  gap: 0.6rem;
-}
-
-// ─── Toast ────────────────────────────────────────────────────────────────────
-.toast {
-  padding: 0.5rem 0.85rem;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 500;
-  animation: fadeUp 0.2s ease both;
-}
-
-.toastSuccess {
-  background: rgba(76, 175, 125, 0.08);
-  border: 1px solid rgba(76, 175, 125, 0.2);
-  color: $success;
-}
-
-.toastFail {
-  background: rgba(192, 82, 79, 0.08);
-  border: 1px solid rgba(192, 82, 79, 0.2);
-  color: $fail;
-}
-
-// ─── Side panel (below login card) ───────────────────────────────────────────
-.sidePanel {
-  background: $surface;
-  border: 1px solid $border;
-  border-radius: 10px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.sidePanelAccent { border-color: #333; }
-
-.sidePanelHeader {
-  display: flex;
+  align-items: flex-start;
   justify-content: space-between;
-  align-items: center;
-  padding: 0.85rem 1.25rem;
-  cursor: pointer;
-  user-select: none;
-
-  // always visible, acts as the collapse toggle affordance
-  &:hover .toggleBtn { border-color: #555; color: $text; }
+  gap: 0.5rem;
 }
 
-.sidePanelTitle {
+.stepLabel {
+  font-family: $font-mono;
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 0.25rem;
+  // colour set inline
+}
+
+.panelTitle {
   font-family: $font-display;
-  font-size: 0.82rem;
-  font-weight: 600;
+  font-size: 1.2rem;
+  font-weight: 400;
   color: $text;
+  letter-spacing: -0.01em;
 }
 
-.sidePanelHint {
-  padding: 0.85rem 1.25rem;
+.stepBadge {
+  flex-shrink: 0;
+  border: 1px solid;
+  border-radius: 20px;
+  padding: 0.2rem 0.7rem;
+  font-family: $font-mono;
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  margin-top: 0.15rem;
+  // colours set inline
+}
+
+.panelDesc {
   font-size: 0.78rem;
   color: $muted;
-  line-height: 1.55;
-  border-top: 1px solid $border;
+  line-height: 1.6;
 }
 
-.toggleBtn {
-  background: transparent;
-  border: 1px solid $border;
-  color: $muted;
-  font-family: $font-body;
-  font-size: 0.72rem;
-  padding: 0.2rem 0.6rem;
-  border-radius: 5px;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: color 0.15s, border-color 0.15s;
-
-  &:hover { color: $text; border-color: #555; }
-}
-
-// ─── Info list — scrollable when expanded ─────────────────────────────────────
-.infoList {
-  display: flex;
-  flex-direction: column;
-  border-top: 1px solid $border;
-  max-height: 260px;
-  overflow-y: auto;
-  animation: fadeUp 0.2s ease both;
-
-  // thin scrollbar
-  scrollbar-width: thin;
-  scrollbar-color: #333 transparent;
-  &::-webkit-scrollbar { width: 4px; }
-  &::-webkit-scrollbar-track { background: transparent; }
-  &::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
-}
-
-.infoItem {
-  padding: 0.65rem 1.25rem;
-  border-bottom: 1px solid $border;
-  flex-shrink: 0;
-
-  &:last-child { border-bottom: none; }
-
-  strong {
-    display: block;
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: $text;
-    margin-bottom: 0.12rem;
-  }
-
-  p {
-    font-size: 0.73rem;
-    color: $muted;
-    line-height: 1.5;
-  }
-}
-
-// ─── Emoji grid ───────────────────────────────────────────────────────────────
-.emojiGridWrap {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-}
-
-.emojiSequence {
-  display: flex;
-  gap: 0.4rem;
-  justify-content: center;
-}
-
-.emojiSlot {
-  width: 38px;
-  height: 38px;
-  border-radius: 8px;
-  border: 2px dashed $border;
+// ─── Masked input display ─────────────────────────────────────────────────────
+.maskedField {
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 0 0.9rem;
+  border: 1.5px solid $border;
+  border-radius: 10px;
   background: $surface2;
-  transition: border-color 0.15s;
-
-  &.filled {
-    border-style: solid;
-    border-color: #555;
-    background: #252525;
-    animation: popIn 0.12s ease both;
-  }
+  transition: border-color 0.15s, background 0.15s;
 }
 
-@keyframes popIn {
-  from { transform: scale(0.78); opacity: 0; }
-  to   { transform: scale(1);    opacity: 1; }
+.maskedDots {
+  font-size: 1.1rem;
+  letter-spacing: 0.18em;
+  font-family: $font-mono;
+  transition: color 0.15s;
 }
 
-.emojiGrid {
+.maskedPlaceholder {
+  font-size: 0.78rem;
+  color: $muted2;
+  letter-spacing: 0.02em;
+  font-family: $font-body;
+}
+
+// ─── Number pad 5×2 ──────────────────────────────────────────────────────────
+.numberPad {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 0.4rem;
+  gap: 0.45rem;
+  max-width: 340px;
+  margin: 0 auto;
+  width: 100%;
 }
 
-.emojiCell {
-  width: 100%;
-  height: 72px;
+.numKey {
+  height: 54px;
   background: $surface2;
   border: 1px solid $border;
-  border-radius: 8px;
+  border-radius: 10px;
+  color: $text;
+  font-family: $font-mono;
+  font-size: 1.1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s, transform 0.1s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+
+  &:hover:not(:disabled) {
+    background: $border;
+    border-color: $border2;
+    transform: scale(1.04);
+  }
+  &:active:not(:disabled) { transform: scale(0.96); }
+  &:disabled { opacity: 0.3; cursor: not-allowed; }
+}
+
+// ─── Emoji grid 4×3 ──────────────────────────────────────────────────────────
+.emojiGrid4x3 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.45rem;
+  max-width: 340px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+
+.emojiKey {
+  height: 62px;
+  background: $surface2;
+  border: 1px solid $border;
+  border-radius: 12px;
   font-size: 1.5rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.12s, transform 0.1s, border-color 0.12s;
+  transition: background 0.1s, border-color 0.1s, transform 0.1s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  width: 100%;
 
   &:hover:not(:disabled) {
-    background: #2a2a2a;
-    border-color: #555;
-    transform: scale(1.05);
+    background: $border;
+    border-color: $border2;
+    transform: scale(1.06);
   }
-  &:active:not(:disabled) { transform: scale(0.96); }
-  &:disabled { opacity: 0.25; cursor: not-allowed; }
+  &:active:not(:disabled) { transform: scale(0.94); }
+  &:disabled { opacity: 0.3; cursor: not-allowed; }
 }
 
-.backspaceBtn {
-  align-self: flex-end;
-  background: transparent;
+// ─── Mixed grid — unified 4×4 (numbers + emoji together) ─────────────────────
+.mixedGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.45rem;
+  max-width: 340px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+// ─── Action bar ───────────────────────────────────────────────────────────────
+.actionBar {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.actionPrimary {
+  flex: 1;
+  height: 46px;
+  background: $surface2;
   border: 1px solid $border;
+  border-radius: 10px;
   color: $muted;
   font-family: $font-body;
-  font-size: 0.72rem;
-  padding: 0.22rem 0.6rem;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: not-allowed;
+  transition: all 0.15s;
 
-  &:hover:not(:disabled) { color: $text; border-color: #555; }
-  &:disabled { opacity: 0.2; cursor: not-allowed; }
+  &:not(:disabled) {
+    color: #fff;
+    cursor: pointer;
+    // background/border/shadow set inline via accent
+  }
+
+  &:not(:disabled):hover { filter: brightness(1.08); }
+  &:not(:disabled):active { filter: brightness(0.95); }
+}
+
+.actionIcon {
+  width: 46px;
+  height: 46px;
+  background: $surface2;
+  border: 1px solid $border;
+  border-radius: 10px;
+  color: $muted;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover:not(:disabled) { color: $text; border-color: $border2; background: $border; }
+  &:disabled { opacity: 0.3; cursor: not-allowed; }
+}
+
+// ─── Toasts ───────────────────────────────────────────────────────────────────
+.toast {
+  padding: 0.6rem 0.9rem;
+  border-radius: 9px;
+  font-family: $font-mono;
+  font-size: 0.78rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  animation: fadeUp 0.2s ease both;
+}
+
+.toastSuccess {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: $success;
+}
+
+.toastFail {
+  background: #fff5f5;
+  border: 1px solid #fecaca;
+  color: $fail;
 }
