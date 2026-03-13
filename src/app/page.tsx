@@ -287,9 +287,10 @@ interface PanelProps {
   onComplete:       (result: ModeResult) => void;
   username:         string;
   onUsernameChange: (v: string) => void;
+  onRegistering:    (v: boolean) => void;
 }
 
-function PasscodePanel({ mode, accent, renderPad, onReset, onComplete, username, onUsernameChange }: PanelProps) {
+function PasscodePanel({ mode, accent, renderPad, onReset, onComplete, username, onUsernameChange, onRegistering }: PanelProps) {
   const [authTab,     setAuthTab]     = useState<"register" | "login">("register");
   const [sequence,    setSequence]    = useState<string[]>([]);
   const [status,      setStatus]      = useState<null | "success" | "fail" | "registered" | "exists" | "notfound">(null);
@@ -325,7 +326,8 @@ function PasscodePanel({ mode, accent, renderPad, onReset, onComplete, username,
       if (userStore[key]) { setStatus("exists"); return; }
       userStore[key] = { password: sequence };
       setRegistering(true);
-      setTimeout(() => { setRegistering(false); setStatus(null); setSequence([]); setAuthTab("login"); firstKeyTime.current = null; onReset?.(); }, 1000);
+      onRegistering(true);
+      setTimeout(() => { setRegistering(false); onRegistering(false); setStatus(null); setSequence([]); setAuthTab("login"); firstKeyTime.current = null; onReset?.(); }, 1000);
     } else {
       const user = userStore[key];
       if (!user) { setStatus("notfound"); return; }
@@ -349,7 +351,6 @@ function PasscodePanel({ mode, accent, renderPad, onReset, onComplete, username,
 
   return (
     <div className="panel" style={{ borderTopColor: accent }}>
-      {registering && <Loading />}
       <div className="authTabBar">
         {(["register","login"] as const).map(t => (
           <button
@@ -426,6 +427,7 @@ export default function Home() {
   const [modal,          setModal]          = useState<ModalType>(null);
   const [missingMode,    setMissingMode]    = useState<"emoji" | "mixed" | null>(null);
   const [saving,         setSaving]         = useState(false);
+  const [registering,    setRegistering]    = useState(false);
 
   const handleComplete = async (result: ModeResult) => {
     setSaving(true);
@@ -493,7 +495,7 @@ export default function Home() {
   return (
     <main className="main">
       {/* Modal */}
-      {saving && <Loading />}
+      {(saving || registering) && <Loading />}
       <Modal
         type={modal}
         onClose={handleCloseModal}
@@ -542,9 +544,9 @@ export default function Home() {
       </div>
 
       <div className="tabBody" key={tab}>
-        {tab === "number" && <NumberMode onComplete={handleComplete} username={username} onUsernameChange={setUsername} />}
-        {tab === "emoji"  && <EmojiMode  onComplete={handleComplete} username={username} onUsernameChange={setUsername} />}
-        {tab === "mixed"  && <MixedMode  onComplete={handleComplete} username={username} onUsernameChange={setUsername} />}
+        {tab === "number" && <NumberMode onComplete={handleComplete} username={username} onUsernameChange={setUsername} onRegistering={setRegistering} />}
+        {tab === "emoji"  && <EmojiMode  onComplete={handleComplete} username={username} onUsernameChange={setUsername} onRegistering={setRegistering} />}
+        {tab === "mixed"  && <MixedMode  onComplete={handleComplete} username={username} onUsernameChange={setUsername} onRegistering={setRegistering} />}
       </div>
     </main>
   );
