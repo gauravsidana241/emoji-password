@@ -202,7 +202,7 @@ function Survey({ studentId, results, onDone }: { studentId: string; results: Mo
         ageRange,
       });
       setSubmitted(true);
-      setTimeout(onDone, 2200);
+      setTimeout(onDone, 200);
     } catch (err) {
       console.error("Failed to save survey:", err);
       setSaving(false);
@@ -290,11 +290,12 @@ interface PanelProps {
 }
 
 function PasscodePanel({ mode, accent, renderPad, onReset, onComplete, username, onUsernameChange }: PanelProps) {
-  const [authTab,  setAuthTab]  = useState<"register" | "login">("register");
-  const [sequence, setSequence] = useState<string[]>([]);
-  const [status,   setStatus]   = useState<null | "success" | "fail" | "registered" | "exists" | "notfound">(null);
-  const [errors,   setErrors]   = useState(0);
-  const firstKeyTime             = useRef<number | null>(null);
+  const [authTab,     setAuthTab]     = useState<"register" | "login">("register");
+  const [sequence,    setSequence]    = useState<string[]>([]);
+  const [status,      setStatus]      = useState<null | "success" | "fail" | "registered" | "exists" | "notfound">(null);
+  const [errors,      setErrors]      = useState(0);
+  const [registering, setRegistering] = useState(false);
+  const firstKeyTime                   = useRef<number | null>(null);
 
   const usernameValid = STUDENT_ID_REGEX.test(username);
   const atLimit       = sequence.length >= MAX_PASSWORD_LENGTH;
@@ -323,8 +324,8 @@ function PasscodePanel({ mode, accent, renderPad, onReset, onComplete, username,
     if (authTab === "register") {
       if (userStore[key]) { setStatus("exists"); return; }
       userStore[key] = { password: sequence };
-      setStatus("registered");
-      setTimeout(() => { setStatus(null); setSequence([]); setAuthTab("login"); firstKeyTime.current = null; onReset?.(); }, 1800);
+      setRegistering(true);
+      setTimeout(() => { setRegistering(false); setStatus(null); setSequence([]); setAuthTab("login"); firstKeyTime.current = null; onReset?.(); }, 1000);
     } else {
       const user = userStore[key];
       if (!user) { setStatus("notfound"); return; }
@@ -336,7 +337,7 @@ function PasscodePanel({ mode, accent, renderPad, onReset, onComplete, username,
           setStatus(null); setSequence([]); firstKeyTime.current = null; onReset?.();
           onComplete({ mode, loginTimeMs, errorCount: errors });
           setErrors(0);
-        }, 1500);
+        }, 200);
       } else {
         setErrors(e => e + 1);
         setStatus("fail");
@@ -348,6 +349,7 @@ function PasscodePanel({ mode, accent, renderPad, onReset, onComplete, username,
 
   return (
     <div className="panel" style={{ borderTopColor: accent }}>
+      {registering && <Loading />}
       <div className="authTabBar">
         {(["register","login"] as const).map(t => (
           <button
@@ -439,7 +441,7 @@ export default function Home() {
     if (result.mode === "number") {
       // Unlock emoji tabs and show unlocked modal
       setUnlockedTabs(new Set(["number", "emoji", "mixed"]));
-      setTimeout(() => setModal("unlocked"), 1600);
+      setTimeout(() => setModal("unlocked"), 200);
       return;
     }
 
@@ -449,12 +451,12 @@ export default function Home() {
 
     if (hasEmoji && hasMixed) {
       // All three done — go straight to survey
-      setTimeout(() => setShowSurvey(true), 1600);
+      setTimeout(() => setShowSurvey(true), 200);
     } else {
       // One emoji mode done — nudge toward the other, but let them skip
       const missing = hasEmoji ? "mixed" : "emoji";
       setMissingMode(missing);
-      setTimeout(() => setModal("nudge"), 1600);
+      setTimeout(() => setModal("nudge"), 200);
     }
   };
 
