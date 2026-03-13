@@ -409,6 +409,15 @@ function PasscodePanel({ mode, accent, renderPad, onReset, onComplete, username,
       {status === "exists"     && <div className="toast toastFail">✕ Already registered — switch to Login</div>}
       {status === "notfound"   && <div className="toast toastFail">✕ Not found — register first</div>}
       {status === "error"      && <div className="toast toastFail">✕ Something went wrong — try again</div>}
+
+      {authTab === "login" && (
+        <a
+          className="forgotBtn"
+          href={`mailto:3152623s@student.gla.ac.uk?subject=Password Recovery&body=Student ID: ${username}%0ARequest: recover`}
+        >
+          Forgot passcode? Request reset →
+        </a>
+      )}
     </div>
   );
 }

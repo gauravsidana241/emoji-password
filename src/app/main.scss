@@ -637,3 +637,15 @@ body { background: $bg; }
 
 .returningHint { font-family: $font-mono; font-size: 0.65rem; }
 .returningHintError { color: $fail; }
+
+// ─── Forgot passcode ──────────────────────────────────────────────────────────
+.forgotBtn {
+  font-family: $font-mono;
+  font-size: 0.65rem;
+  color: $muted2;
+  text-decoration: none;
+  letter-spacing: 0.04em;
+  text-align: center;
+  transition: color 0.15s;
+  &:hover { color: $muted; }
+}
