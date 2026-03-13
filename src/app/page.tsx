@@ -107,6 +107,15 @@ function Modal({ type, onClose, onGoToSurvey, onGoToMissing, missingMode }: Moda
   );
 }
 
+// ─── Loading spinner ─────────────────────────────────────────────────────────
+function Loading() {
+  return (
+    <div className="loadingOverlay">
+      <div className="loadingSpinner" />
+    </div>
+  );
+}
+
 // ─── Masked field ─────────────────────────────────────────────────────────────
 function MaskedField({ count, accent }: { count: number; accent: string }) {
   return (
@@ -199,6 +208,8 @@ function Survey({ studentId, results, onDone }: { studentId: string; results: Mo
       setSaving(false);
     }
   };
+
+  if (saving) return <Loading />;
 
   if (submitted) {
     return (
@@ -412,8 +423,10 @@ export default function Home() {
   const [showSurvey,     setShowSurvey]     = useState(false);
   const [modal,          setModal]          = useState<ModalType>(null);
   const [missingMode,    setMissingMode]    = useState<"emoji" | "mixed" | null>(null);
+  const [saving,         setSaving]         = useState(false);
 
   const handleComplete = async (result: ModeResult) => {
+    setSaving(true);
     const newResults   = [...results, result];
     const newCompleted = new Set([...completedModes, result.mode as TabId]);
     setResults(newResults);
@@ -421,6 +434,7 @@ export default function Home() {
 
     try { await saveResult(username, result); }
     catch (err) { console.error("Failed to save result:", err); }
+    finally { setSaving(false); }
 
     if (result.mode === "number") {
       // Unlock emoji tabs and show unlocked modal
@@ -477,6 +491,7 @@ export default function Home() {
   return (
     <main className="main">
       {/* Modal */}
+      {saving && <Loading />}
       <Modal
         type={modal}
         onClose={handleCloseModal}
