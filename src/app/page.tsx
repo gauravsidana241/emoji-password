@@ -29,31 +29,29 @@ export interface ModeResult {
 }
 
 type ModalType = "unlocked" | "nudge" | null;
+type TabId     = "number" | "emoji" | "mixed";
 
 // ─── API helpers ─────────────────────────────────────────────────────────────
-async function apiRegister(studentId: string, mode: string, password: string): Promise<{ ok: boolean; error?: string }> {
+async function apiRegister(studentId: string, mode: string, password: string) {
   const res = await fetch(`${API_URL}/api/register`, {
-    method:  "POST",
-    headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify({ studentId, mode, password }),
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ studentId, mode, password }),
   });
   return res.json();
 }
 
-async function apiLogin(studentId: string, mode: string, password: string): Promise<{ ok: boolean; error?: string }> {
+async function apiLogin(studentId: string, mode: string, password: string) {
   const res = await fetch(`${API_URL}/api/login`, {
-    method:  "POST",
-    headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify({ studentId, mode, password }),
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ studentId, mode, password }),
   });
   return res.json();
 }
 
-async function saveResult(studentId: string, result: ModeResult): Promise<void> {
+async function saveResult(studentId: string, result: ModeResult) {
   await fetch(`${API_URL}/api/result`, {
-    method:  "POST",
-    headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify({ studentId, ...result }),
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ studentId, ...result }),
   });
 }
 
@@ -61,28 +59,109 @@ async function saveSurvey(
   studentId: string,
   results:   ModeResult[],
   survey:    { usedEmojiInputBefore: boolean; intuitiveness: number; ageRange: string }
-): Promise<void> {
+) {
   await Promise.all(results.map(r => saveResult(studentId, r)));
   await fetch(`${API_URL}/api/survey`, {
-    method:  "POST",
-    headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify({ studentId, ...survey }),
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ studentId, ...survey }),
   });
 }
 
-// ─── Sequence → storable string ──────────────────────────────────────────────
-// Join with a separator so emoji like 🦊🚀 don't collide
-function sequenceToString(seq: string[]): string {
-  return seq.join("|");
+async function apiGetParticipant(studentId: string) {
+  const res = await fetch(`${API_URL}/api/participant/${studentId}`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
+function sequenceToString(seq: string[]): string { return seq.join("|"); }
+
+// ─── Returning user panel ─────────────────────────────────────────────────────
+function ReturningUserPanel({ onRestore }: {
+  onRestore: (studentId: string, unlockedTabs: Set<TabId>, completedModes: Set<TabId>) => void;
+}) {
+  const [open,      setOpen]      = useState(false);
+  const [studentId, setStudentId] = useState("");
+  const [status,    setStatus]    = useState<"idle" | "loading" | "notfound" | "error">("idle");
+
+  const isValid = STUDENT_ID_REGEX.test(studentId);
+
+  const handleRestore = async () => {
+    if (!isValid) return;
+    setStatus("loading");
+    try {
+      const data = await apiGetParticipant(studentId);
+      if (!data) { setStatus("notfound"); return; }
+
+      const unlocked  = new Set<TabId>(["number"]);
+      const completed = new Set<TabId>();
+
+      // Unlock modes they've registered for
+      if (data.registered.emoji  || data.registered.mixed)  unlocked.add("emoji");
+      if (data.registered.mixed  || data.registered.emoji)  unlocked.add("mixed");
+      if (data.registered.number && (data.registered.emoji || data.registered.mixed)) {
+        unlocked.add("emoji"); unlocked.add("mixed");
+      }
+
+      // Mark modes they've fully completed (login recorded)
+      if (data.completed.number) completed.add("number");
+      if (data.completed.emoji)  completed.add("emoji");
+      if (data.completed.mixed)  completed.add("mixed");
+
+      // If they registered any emoji mode, unlock both
+      if (data.registered.emoji || data.registered.mixed) {
+        unlocked.add("emoji"); unlocked.add("mixed");
+      }
+
+      onRestore(studentId, unlocked, completed);
+      setOpen(false);
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  if (!open) {
+    return (
+      <button className="returningBtn" onClick={() => setOpen(true)}>
+        Returning user? →
+      </button>
+    );
+  }
+
+  return (
+    <div className="returningPanel">
+      <p className="returningTitle">Enter your student ID to restore progress</p>
+      <div className="returningRow">
+        <input
+          className="usernameInput"
+          type="text"
+          maxLength={8}
+          placeholder="e.g. 3152623s"
+          value={studentId}
+          onChange={e => { setStudentId(e.target.value); setStatus("idle"); }}
+          spellCheck={false}
+          autoComplete="off"
+          style={studentId.length > 0 ? isValid ? { borderColor: "#16a34a" } : { borderColor: "#dc2626" } : {}}
+        />
+        <button
+          className="returningConfirm"
+          disabled={!isValid || status === "loading"}
+          onClick={handleRestore}
+        >
+          {status === "loading" ? "…" : "Restore →"}
+        </button>
+        <button className="returningCancel" onClick={() => setOpen(false)}>✕</button>
+      </div>
+      {status === "notfound" && <p className="returningHint returningHintError">Student ID not found — are you new here?</p>}
+      {status === "error"    && <p className="returningHint returningHintError">Something went wrong — try again</p>}
+    </div>
+  );
 }
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
 interface ModalProps {
-  type:          ModalType;
-  onClose:       () => void;
-  onGoToSurvey:  () => void;
-  onGoToMissing: (tab: "emoji" | "mixed") => void;
-  missingMode:   "emoji" | "mixed" | null;
+  type: ModalType; onClose: () => void;
+  onGoToSurvey: () => void; onGoToMissing: (tab: "emoji" | "mixed") => void;
+  missingMode: "emoji" | "mixed" | null;
 }
 
 function Modal({ type, onClose, onGoToSurvey, onGoToMissing, missingMode }: ModalProps) {
@@ -116,13 +195,9 @@ function Modal({ type, onClose, onGoToSurvey, onGoToMissing, missingMode }: Moda
   );
 }
 
-// ─── Loading spinner ──────────────────────────────────────────────────────────
+// ─── Loading ──────────────────────────────────────────────────────────────────
 function Loading() {
-  return (
-    <div className="loadingOverlay">
-      <div className="loadingSpinner" />
-    </div>
-  );
+  return <div className="loadingOverlay"><div className="loadingSpinner" /></div>;
 }
 
 // ─── Masked field ─────────────────────────────────────────────────────────────
@@ -141,21 +216,14 @@ function MaskedField({ count, accent }: { count: number; accent: string }) {
 
 // ─── Username field ───────────────────────────────────────────────────────────
 function UsernameField({ value, onChange, accent }: { value: string; onChange: (v: string) => void; accent: string }) {
-  const isValid  = STUDENT_ID_REGEX.test(value);
-  const hasInput = value.length > 0;
+  const isValid = STUDENT_ID_REGEX.test(value); const hasInput = value.length > 0;
   return (
     <div className="usernameWrapper">
       <label className="usernameLabel">Student ID</label>
-      <input
-        className="usernameInput"
-        type="text"
-        maxLength={8}
-        placeholder="e.g. 3152623s"
-        value={value}
+      <input className="usernameInput" type="text" maxLength={8} placeholder="e.g. 3152623s" value={value}
         onChange={e => onChange(e.target.value)}
         style={hasInput ? isValid ? { borderColor: "#16a34a", background: "#f0fdf4" } : { borderColor: "#dc2626", background: "#fff5f5" } : {}}
-        spellCheck={false}
-        autoComplete="off"
+        spellCheck={false} autoComplete="off"
       />
       {hasInput && !isValid && <span className="usernameHint usernameHintError">Must be 7 digits followed by a letter (e.g. 3152623s)</span>}
       {hasInput &&  isValid && <span className="usernameHint usernameHintOk">✓ Valid student ID</span>}
@@ -165,70 +233,42 @@ function UsernameField({ value, onChange, accent }: { value: string; onChange: (
 
 // ─── Pads ─────────────────────────────────────────────────────────────────────
 function NumberPad({ onPress }: { onPress: (v: string) => void }) {
-  return (
-    <div className="numberPad">
-      {NUMBER_POOL.map(n => <button key={n} className="numKey" onClick={() => onPress(n)}>{n}</button>)}
-    </div>
-  );
+  return <div className="numberPad">{NUMBER_POOL.map(n => <button key={n} className="numKey" onClick={() => onPress(n)}>{n}</button>)}</div>;
 }
-
 function EmojiGridDisplay({ pool, onPress, disabled }: { pool: string[]; onPress: (v: string) => void; disabled: boolean }) {
-  return (
-    <div className="emojiGrid4x3">
-      {pool.map((em, i) => <button key={i} className="emojiKey" onClick={() => onPress(em)} disabled={disabled}>{em}</button>)}
-    </div>
-  );
+  return <div className="emojiGrid4x3">{pool.map((em, i) => <button key={i} className="emojiKey" onClick={() => onPress(em)} disabled={disabled}>{em}</button>)}</div>;
 }
-
 function MixedGrid({ numPool, emojiPool, onPress }: { numPool: string[]; emojiPool: string[]; onPress: (v: string) => void }) {
-  const items = [...numPool, ...emojiPool];
-  return (
-    <div className="mixedGrid">
-      {items.map((item, i) => (
-        <button key={i} className={isNaN(Number(item)) ? "emojiKey" : "numKey"} onClick={() => onPress(item)}>{item}</button>
-      ))}
-    </div>
-  );
+  return <div className="mixedGrid">{[...numPool, ...emojiPool].map((item, i) => <button key={i} className={isNaN(Number(item)) ? "emojiKey" : "numKey"} onClick={() => onPress(item)}>{item}</button>)}</div>;
 }
 
 // ─── Survey ───────────────────────────────────────────────────────────────────
 function Survey({ studentId, results, onDone }: { studentId: string; results: ModeResult[]; onDone: () => void }) {
   const [used,      setUsed]      = useState<"yes" | "no" | null>(null);
   const [intuitive, setIntuitive] = useState<number | null>(null);
-  const [ageRange,  setAgeRange]  = useState<string>("");
+  const [ageRange,  setAgeRange]  = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [saving,    setSaving]    = useState(false);
-
   const ready = used !== null && intuitive !== null && ageRange !== "";
 
   const handleSubmit = async () => {
     if (!ready || saving) return;
     setSaving(true);
     try {
-      await saveSurvey(studentId, results, {
-        usedEmojiInputBefore: used === "yes",
-        intuitiveness:        intuitive!,
-        ageRange,
-      });
+      await saveSurvey(studentId, results, { usedEmojiInputBefore: used === "yes", intuitiveness: intuitive!, ageRange });
       setSubmitted(true);
       setTimeout(onDone, 200);
-    } catch (err) {
-      console.error("Failed to save survey:", err);
-      setSaving(false);
-    }
+    } catch { setSaving(false); }
   };
 
   if (saving) return <Loading />;
-
-  if (submitted) {
-    return (
-      <div className="surveyPanel surveyDone">
-        <div className="surveyDoneIcon">✓</div>
-        <p className="surveyDoneTitle">Thanks for participating!</p>
-        <p className="surveyDoneSub">Your data has been recorded.</p>
-      </div>
-    );
-  }
+  if (submitted) return (
+    <div className="surveyPanel surveyDone">
+      <div className="surveyDoneIcon">✓</div>
+      <p className="surveyDoneTitle">Thanks for participating!</p>
+      <p className="surveyDoneSub">Your data has been recorded.</p>
+    </div>
+  );
 
   return (
     <div className="surveyPanel">
@@ -237,7 +277,6 @@ function Survey({ studentId, results, onDone }: { studentId: string; results: Mo
         <h2 className="surveyTitle">Almost done!</h2>
         <p className="panelDesc">Takes 15 seconds. Helps us validate results across different users.</p>
       </div>
-
       <div className="surveyResults">
         {results.map(r => (
           <div key={r.mode} className="surveyResultChip">
@@ -247,40 +286,26 @@ function Survey({ studentId, results, onDone }: { studentId: string; results: Mo
           </div>
         ))}
       </div>
-
       <div className="surveyQuestion">
         <label className="surveyLabel">Have you used emoji-based input before?</label>
         <div className="surveyBtnGroup">
-          {(["yes", "no"] as const).map(v => (
-            <button key={v} className={`surveyBtn ${used === v ? "surveyBtnActive" : ""}`} onClick={() => setUsed(v)}>{v}</button>
-          ))}
+          {(["yes","no"] as const).map(v => <button key={v} className={`surveyBtn ${used === v ? "surveyBtnActive" : ""}`} onClick={() => setUsed(v)}>{v}</button>)}
         </div>
       </div>
-
       <div className="surveyQuestion">
         <label className="surveyLabel">How intuitive was the emoji / mixed input? (1 = confusing, 5 = natural)</label>
         <div className="surveyBtnGroup">
-          {[1,2,3,4,5].map(n => (
-            <button key={n} className={`surveyBtn surveyBtnNum ${intuitive === n ? "surveyBtnActive" : ""}`} onClick={() => setIntuitive(n)}>{n}</button>
-          ))}
+          {[1,2,3,4,5].map(n => <button key={n} className={`surveyBtn surveyBtnNum ${intuitive === n ? "surveyBtnActive" : ""}`} onClick={() => setIntuitive(n)}>{n}</button>)}
         </div>
       </div>
-
       <div className="surveyQuestion">
         <label className="surveyLabel">Age range</label>
         <div className="surveyBtnGroup surveyBtnGroupWrap">
-          {["Under 18","18–24","25–34","35–44","45+"].map(a => (
-            <button key={a} className={`surveyBtn ${ageRange === a ? "surveyBtnActive" : ""}`} onClick={() => setAgeRange(a)}>{a}</button>
-          ))}
+          {["Under 18","18–24","25–34","35–44","45+"].map(a => <button key={a} className={`surveyBtn ${ageRange === a ? "surveyBtnActive" : ""}`} onClick={() => setAgeRange(a)}>{a}</button>)}
         </div>
       </div>
-
-      <button
-        className="actionPrimary surveySubmit"
-        disabled={!ready || saving}
-        onClick={handleSubmit}
-        style={ready && !saving ? { background: "#7c3aed", borderColor: "#7c3aed", boxShadow: "0 2px 14px #7c3aed30", color: "#fff" } : {}}
-      >
+      <button className="actionPrimary surveySubmit" disabled={!ready || saving} onClick={handleSubmit}
+        style={ready && !saving ? { background: "#7c3aed", borderColor: "#7c3aed", boxShadow: "0 2px 14px #7c3aed30", color: "#fff" } : {}}>
         {saving ? "Saving…" : "Submit →"}
       </button>
     </div>
@@ -289,14 +314,10 @@ function Survey({ studentId, results, onDone }: { studentId: string; results: Mo
 
 // ─── Passcode Panel ───────────────────────────────────────────────────────────
 interface PanelProps {
-  mode:             "number" | "emoji" | "mixed";
-  accent:           string;
-  renderPad:        (onPress: (v: string) => void) => ReactNode;
-  onReset?:         () => void;
-  onComplete:       (result: ModeResult) => void;
-  username:         string;
-  onUsernameChange: (v: string) => void;
-  onLoading:        (v: boolean) => void;
+  mode: "number" | "emoji" | "mixed"; accent: string;
+  renderPad: (onPress: (v: string) => void) => ReactNode;
+  onReset?: () => void; onComplete: (result: ModeResult) => void;
+  username: string; onUsernameChange: (v: string) => void; onLoading: (v: boolean) => void;
 }
 
 function PasscodePanel({ mode, accent, renderPad, onReset, onComplete, username, onUsernameChange, onLoading }: PanelProps) {
@@ -312,22 +333,16 @@ function PasscodePanel({ mode, accent, renderPad, onReset, onComplete, username,
   const handlePress = (val: string) => {
     if (atLimit) return;
     if (firstKeyTime.current === null) firstKeyTime.current = Date.now();
-    setStatus(null);
-    setSequence(prev => [...prev, val]);
+    setStatus(null); setSequence(prev => [...prev, val]);
   };
 
   const handleBackspace = () => { setStatus(null); setSequence(prev => prev.slice(0, -1)); };
-
-  const handleReset = () => { setSequence([]); setStatus(null); firstKeyTime.current = null; onReset?.(); };
-
-  const handleSwitchTab = (t: "register" | "login") => {
-    setAuthTab(t); setSequence([]); setStatus(null); firstKeyTime.current = null;
-  };
+  const handleReset     = () => { setSequence([]); setStatus(null); firstKeyTime.current = null; onReset?.(); };
+  const handleSwitchTab = (t: "register" | "login") => { setAuthTab(t); setSequence([]); setStatus(null); firstKeyTime.current = null; };
 
   const handleAction = async () => {
     if (!usernameValid || sequence.length === 0) return;
     const password = sequenceToString(sequence);
-
     onLoading(true);
 
     if (authTab === "register") {
@@ -342,8 +357,6 @@ function PasscodePanel({ mode, accent, renderPad, onReset, onComplete, username,
         setStatus("error");
       }
     } else {
-      // Start timing from first keypress, but if they came back after refresh
-      // firstKeyTime may be null — start it now
       if (firstKeyTime.current === null) firstKeyTime.current = Date.now();
       const result = await apiLogin(username, mode, password);
       onLoading(false);
@@ -358,8 +371,7 @@ function PasscodePanel({ mode, accent, renderPad, onReset, onComplete, username,
       } else if (result.error?.includes("Not registered")) {
         setStatus("notfound");
       } else {
-        setErrors(e => e + 1);
-        setStatus("fail");
+        setErrors(e => e + 1); setStatus("fail");
       }
     }
   };
@@ -370,40 +382,27 @@ function PasscodePanel({ mode, accent, renderPad, onReset, onComplete, username,
     <div className="panel" style={{ borderTopColor: accent }}>
       <div className="authTabBar">
         {(["register","login"] as const).map(t => (
-          <button
-            key={t}
-            className={`authTab ${authTab === t ? "authTabActive" : ""}`}
+          <button key={t} className={`authTab ${authTab === t ? "authTabActive" : ""}`}
             style={authTab === t ? { color: accent, borderBottomColor: accent } : {}}
-            onClick={() => handleSwitchTab(t)}
-          >
+            onClick={() => handleSwitchTab(t)}>
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
       </div>
-
       <p className="panelDesc">
-        {authTab === "register"
-          ? "Enter your student ID and build a passcode up to 8 characters."
-          : "Enter your student ID and your passcode to verify your identity."}
+        {authTab === "register" ? "Enter your student ID and build a passcode up to 8 characters." : "Enter your student ID and your passcode to verify your identity."}
       </p>
-
       <UsernameField value={username} onChange={onUsernameChange} accent={accent} />
       <MaskedField count={sequence.length} accent={accent} />
       {renderPad(handlePress)}
-
       <div className="actionBar">
-        <button
-          className="actionPrimary"
-          onClick={handleAction}
-          disabled={!ready}
-          style={ready ? { background: accent, borderColor: accent, boxShadow: `0 2px 14px ${accent}30`, color: "#fff" } : {}}
-        >
+        <button className="actionPrimary" onClick={handleAction} disabled={!ready}
+          style={ready ? { background: accent, borderColor: accent, boxShadow: `0 2px 14px ${accent}30`, color: "#fff" } : {}}>
           {authTab === "register" ? "Register →" : "Login →"}
         </button>
         <button className="actionIcon" onClick={handleBackspace} disabled={sequence.length === 0} title="Backspace">⌫</button>
         <button className="actionIcon" onClick={handleReset} title="Clear">↺</button>
       </div>
-
       {status === "registered" && <div className="toast toastSuccess">✓ Registered! Switching to login…</div>}
       {status === "success"    && <div className="toast toastSuccess">✓ Login successful!</div>}
       {status === "fail"       && <div className="toast toastFail">✕ Passcode mismatch — try again</div>}
@@ -429,11 +428,10 @@ function MixedMode({ onComplete, username, onUsernameChange, onLoading }: { onCo
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
 const TABS = [
-  { id: "number", label: "0–9  Numeric", accent: "#2563eb" },
-  { id: "emoji",  label: "Emoji",        accent: "#db2777" },
-  { id: "mixed",  label: "Mixed",        accent: "#7c3aed" },
-] as const;
-type TabId = typeof TABS[number]["id"];
+  { id: "number" as TabId, label: "0–9  Numeric", accent: "#2563eb" },
+  { id: "emoji"  as TabId, label: "Emoji",        accent: "#db2777" },
+  { id: "mixed"  as TabId, label: "Mixed",        accent: "#7c3aed" },
+];
 
 export default function Home() {
   const [tab,            setTab]            = useState<TabId>("number");
@@ -445,6 +443,12 @@ export default function Home() {
   const [modal,          setModal]          = useState<ModalType>(null);
   const [missingMode,    setMissingMode]    = useState<"emoji" | "mixed" | null>(null);
   const [loading,        setLoading]        = useState(false);
+
+  const handleRestore = (studentId: string, unlocked: Set<TabId>, completed: Set<TabId>) => {
+    setUsername(studentId);
+    setUnlockedTabs(unlocked);
+    setCompletedModes(completed);
+  };
 
   const handleComplete = async (result: ModeResult) => {
     setLoading(true);
@@ -458,19 +462,17 @@ export default function Home() {
     finally { setLoading(false); }
 
     if (result.mode === "number") {
-      setUnlockedTabs(new Set(["number", "emoji", "mixed"]));
+      setUnlockedTabs(new Set(["number","emoji","mixed"]));
       setTimeout(() => setModal("unlocked"), 200);
       return;
     }
 
     const hasEmoji = newCompleted.has("emoji");
     const hasMixed = newCompleted.has("mixed");
-
     if (hasEmoji && hasMixed) {
       setTimeout(() => setShowSurvey(true), 200);
     } else {
-      const missing = hasEmoji ? "mixed" : "emoji";
-      setMissingMode(missing);
+      setMissingMode(hasEmoji ? "mixed" : "emoji");
       setTimeout(() => setModal("nudge"), 200);
     }
   };
@@ -496,31 +498,25 @@ export default function Home() {
   return (
     <main className="main">
       {loading && <Loading />}
-      <Modal
-        type={modal}
-        onClose={handleCloseModal}
-        onGoToSurvey={handleGoToSurvey}
-        onGoToMissing={handleGoToMissing}
-        missingMode={missingMode}
-      />
+      <Modal type={modal} onClose={handleCloseModal} onGoToSurvey={handleGoToSurvey} onGoToMissing={handleGoToMissing} missingMode={missingMode} />
 
       <div className="hero">
         <span className="heroPill">Authentication Demo</span>
         <h1 className="heroTitle">Group I: Improving passwords using emojis</h1>
         <p className="heroSub">
-          {completedModes.has("number")
-            ? "Numeric done ✓ — now try Emoji or Mixed"
-            : "Start with Numeric, then unlock Emoji modes"}
+          {completedModes.has("number") ? "Numeric done ✓ — now try Emoji or Mixed" : "Start with Numeric, then unlock Emoji modes"}
         </p>
+      </div>
+
+      {/* Returning user */}
+      <div className="returningWrapper">
+        <ReturningUserPanel onRestore={handleRestore} />
       </div>
 
       <div className="progressBar">
         {TABS.map(t => (
-          <div
-            key={t.id}
-            className={`progressChip ${completedModes.has(t.id) ? "progressChipDone" : ""}`}
-            style={completedModes.has(t.id) ? { borderColor: t.accent, color: t.accent, background: `${t.accent}10` } : {}}
-          >
+          <div key={t.id} className={`progressChip ${completedModes.has(t.id) ? "progressChipDone" : ""}`}
+            style={completedModes.has(t.id) ? { borderColor: t.accent, color: t.accent, background: `${t.accent}10` } : {}}>
             {completedModes.has(t.id) ? "✓ " : ""}{t.label}
           </div>
         ))}
@@ -530,13 +526,11 @@ export default function Home() {
         {TABS.map(t => {
           const locked = !unlockedTabs.has(t.id);
           return (
-            <button
-              key={t.id}
+            <button key={t.id}
               className={`tab ${tab === t.id ? "tabActive" : ""} ${locked ? "tabLocked" : ""}`}
               style={tab === t.id && !locked ? { color: t.accent, borderBottomColor: t.accent } : {}}
               onClick={() => !locked && setTab(t.id)}
-              title={locked ? "Complete Numeric first" : undefined}
-            >
+              title={locked ? "Complete Numeric first" : undefined}>
               {locked ? "🔒 " : ""}{t.label}
             </button>
           );

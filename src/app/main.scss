@@ -559,3 +559,81 @@ body { background: $bg; }
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
+
+// ─── Returning user ───────────────────────────────────────────────────────────
+.returningWrapper {
+  width: 100%;
+  max-width: 460px;
+  margin-bottom: 0.75rem;
+}
+
+.returningBtn {
+  background: transparent;
+  border: none;
+  font-family: $font-mono;
+  font-size: 0.68rem;
+  color: $muted;
+  cursor: pointer;
+  padding: 0;
+  letter-spacing: 0.04em;
+  transition: color 0.15s;
+  &:hover { color: $text; }
+}
+
+.returningPanel {
+  background: $surface;
+  border: 1px solid $border;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  animation: fadeUp 0.2s ease both;
+}
+
+.returningTitle {
+  font-family: $font-mono;
+  font-size: 0.68rem;
+  color: $muted;
+  letter-spacing: 0.04em;
+}
+
+.returningRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.returningConfirm {
+  height: 44px;
+  padding: 0 1rem;
+  background: $text;
+  border: 1px solid $text;
+  border-radius: 10px;
+  color: #fff;
+  font-family: $font-body;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+  &:disabled { opacity: 0.4; cursor: not-allowed; }
+  &:not(:disabled):hover { opacity: 0.8; }
+}
+
+.returningCancel {
+  width: 44px; height: 44px;
+  background: transparent;
+  border: 1px solid $border;
+  border-radius: 10px;
+  color: $muted;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+  &:hover { color: $text; border-color: $border2; }
+}
+
+.returningHint { font-family: $font-mono; font-size: 0.65rem; }
+.returningHintError { color: $fail; }
