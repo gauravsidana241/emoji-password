@@ -28,6 +28,8 @@ export interface ModeResult {
   errorCount:  number;
 }
 
+type ModalType = "unlocked" | "nudge" | null;
+
 // ─── API helpers ─────────────────────────────────────────────────────────────
 async function saveResult(studentId: string, result: ModeResult): Promise<void> {
   await fetch(`${API_URL}/api/result`, {
@@ -42,7 +44,6 @@ async function saveSurvey(
   results:   ModeResult[],
   survey:    { usedEmojiInputBefore: boolean; intuitiveness: number; ageRange: string }
 ): Promise<void> {
-  // Save any mode results not yet persisted (belt-and-suspenders)
   await Promise.all(results.map(r => saveResult(studentId, r)));
   await fetch(`${API_URL}/api/survey`, {
     method:  "POST",
@@ -51,8 +52,60 @@ async function saveSurvey(
   });
 }
 
-// ─── In-memory store (register/login only — passwords never go to backend) ───
+// ─── In-memory store ──────────────────────────────────────────────────────────
 const userStore: Record<string, { password: string[] }> = {};
+
+// ─── Modal ────────────────────────────────────────────────────────────────────
+interface ModalProps {
+  type:          ModalType;
+  onClose:       () => void;
+  onGoToSurvey:  () => void;
+  onGoToMissing: (tab: "emoji" | "mixed") => void;
+  missingMode:   "emoji" | "mixed" | null;
+}
+
+function Modal({ type, onClose, onGoToSurvey, onGoToMissing, missingMode }: ModalProps) {
+  if (!type) return null;
+
+  return (
+    <div className="modalOverlay" onClick={onClose}>
+      <div className="modalCard" onClick={e => e.stopPropagation()}>
+        {type === "unlocked" && (
+          <>
+            <div className="modalIcon">🎉</div>
+            <h2 className="modalTitle">Numeric done!</h2>
+            <p className="modalDesc">
+              Emoji and Mixed modes are now unlocked. Try both for the best comparison — or at least one before finishing.
+            </p>
+            <div className="modalActions">
+              <button className="modalBtnPrimary" onClick={onClose}>
+                Try Emoji next →
+              </button>
+            </div>
+          </>
+        )}
+
+        {type === "nudge" && missingMode && (
+          <>
+            <div className="modalIcon">👀</div>
+            <h2 className="modalTitle">You haven't tried {missingMode} yet</h2>
+            <p className="modalDesc">
+              Trying all three gives us the strongest data — and shows you the full comparison. It only takes a minute.
+            </p>
+            <div className="modalActions">
+              <button className="modalBtnPrimary" onClick={() => onGoToMissing(missingMode)}>
+                Try {missingMode} →
+              </button>
+              <button className="modalBtnSecondary" onClick={onGoToSurvey}>
+                Skip to survey
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ─── Masked field ─────────────────────────────────────────────────────────────
 function MaskedField({ count, accent }: { count: number; accent: string }) {
@@ -356,8 +409,9 @@ export default function Home() {
   const [unlockedTabs,   setUnlockedTabs]   = useState<Set<TabId>>(new Set(["number"]));
   const [completedModes, setCompletedModes] = useState<Set<TabId>>(new Set());
   const [results,        setResults]        = useState<ModeResult[]>([]);
-  const [unlockToast,    setUnlockToast]    = useState(false);
   const [showSurvey,     setShowSurvey]     = useState(false);
+  const [modal,          setModal]          = useState<ModalType>(null);
+  const [missingMode,    setMissingMode]    = useState<"emoji" | "mixed" | null>(null);
 
   const handleComplete = async (result: ModeResult) => {
     const newResults   = [...results, result];
@@ -365,24 +419,45 @@ export default function Home() {
     setResults(newResults);
     setCompletedModes(newCompleted);
 
-    // Save mode result to backend immediately
-    try {
-      await saveResult(username, result);
-    } catch (err) {
-      console.error("Failed to save result:", err);
-    }
+    try { await saveResult(username, result); }
+    catch (err) { console.error("Failed to save result:", err); }
 
     if (result.mode === "number") {
+      // Unlock emoji tabs and show unlocked modal
       setUnlockedTabs(new Set(["number", "emoji", "mixed"]));
-      setUnlockToast(true);
-      setTimeout(() => setUnlockToast(false), 4000);
+      setTimeout(() => setModal("unlocked"), 1600);
+      return;
     }
 
-    const hasNumeric   = newCompleted.has("number");
-    const hasEmojiMode = newCompleted.has("emoji") || newCompleted.has("mixed");
-    if (hasNumeric && hasEmojiMode) {
-      setTimeout(() => setShowSurvey(true), 1800);
+    // After completing an emoji mode, check what's missing
+    const hasEmoji = newCompleted.has("emoji");
+    const hasMixed = newCompleted.has("mixed");
+
+    if (hasEmoji && hasMixed) {
+      // All three done — go straight to survey
+      setTimeout(() => setShowSurvey(true), 1600);
+    } else {
+      // One emoji mode done — nudge toward the other, but let them skip
+      const missing = hasEmoji ? "mixed" : "emoji";
+      setMissingMode(missing);
+      setTimeout(() => setModal("nudge"), 1600);
     }
+  };
+
+  const handleGoToSurvey = () => {
+    setModal(null);
+    setShowSurvey(true);
+  };
+
+  const handleGoToMissing = (tab: "emoji" | "mixed") => {
+    setModal(null);
+    setTab(tab);
+  };
+
+  const handleCloseModal = () => {
+    setModal(null);
+    // After unlocked modal, switch to emoji tab automatically
+    if (modal === "unlocked") setTab("emoji");
   };
 
   if (showSurvey) {
@@ -401,6 +476,15 @@ export default function Home() {
 
   return (
     <main className="main">
+      {/* Modal */}
+      <Modal
+        type={modal}
+        onClose={handleCloseModal}
+        onGoToSurvey={handleGoToSurvey}
+        onGoToMissing={handleGoToMissing}
+        missingMode={missingMode}
+      />
+
       <div className="hero">
         <span className="heroPill">Authentication Demo</span>
         <h1 className="heroTitle">Group I: Improving passwords using emojis</h1>
@@ -410,12 +494,6 @@ export default function Home() {
             : "Start with Numeric, then unlock Emoji modes"}
         </p>
       </div>
-
-      {unlockToast && (
-        <div className="unlockToast">
-          ✓ Numeric complete — Emoji and Mixed are now unlocked. Try one or both!
-        </div>
-      )}
 
       <div className="progressBar">
         {TABS.map(t => (
