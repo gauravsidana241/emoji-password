@@ -31,6 +31,24 @@ export interface ModeResult {
 type ModalType = "unlocked" | "nudge" | null;
 
 // ─── API helpers ─────────────────────────────────────────────────────────────
+async function apiRegister(studentId: string, mode: string, password: string): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch(`${API_URL}/api/register`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ studentId, mode, password }),
+  });
+  return res.json();
+}
+
+async function apiLogin(studentId: string, mode: string, password: string): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch(`${API_URL}/api/login`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ studentId, mode, password }),
+  });
+  return res.json();
+}
+
 async function saveResult(studentId: string, result: ModeResult): Promise<void> {
   await fetch(`${API_URL}/api/result`, {
     method:  "POST",
@@ -52,8 +70,11 @@ async function saveSurvey(
   });
 }
 
-// ─── In-memory store ──────────────────────────────────────────────────────────
-const userStore: Record<string, { password: string[] }> = {};
+// ─── Sequence → storable string ──────────────────────────────────────────────
+// Join with a separator so emoji like 🦊🚀 don't collide
+function sequenceToString(seq: string[]): string {
+  return seq.join("|");
+}
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
 interface ModalProps {
@@ -66,7 +87,6 @@ interface ModalProps {
 
 function Modal({ type, onClose, onGoToSurvey, onGoToMissing, missingMode }: ModalProps) {
   if (!type) return null;
-
   return (
     <div className="modalOverlay" onClick={onClose}>
       <div className="modalCard" onClick={e => e.stopPropagation()}>
@@ -74,31 +94,20 @@ function Modal({ type, onClose, onGoToSurvey, onGoToMissing, missingMode }: Moda
           <>
             <div className="modalIcon">🎉</div>
             <h2 className="modalTitle">Numeric done!</h2>
-            <p className="modalDesc">
-              Emoji and Mixed modes are now unlocked. Try both for the best comparison — or at least one before finishing.
-            </p>
+            <p className="modalDesc">Emoji and Mixed modes are now unlocked. Try both for the best comparison — or at least one before finishing.</p>
             <div className="modalActions">
-              <button className="modalBtnPrimary" onClick={onClose}>
-                Try Emoji next →
-              </button>
+              <button className="modalBtnPrimary" onClick={onClose}>Try Emoji next →</button>
             </div>
           </>
         )}
-
         {type === "nudge" && missingMode && (
           <>
             <div className="modalIcon">👀</div>
             <h2 className="modalTitle">You haven't tried {missingMode} yet</h2>
-            <p className="modalDesc">
-              Trying all three gives us the strongest data — and shows you the full comparison. It only takes a minute.
-            </p>
+            <p className="modalDesc">Trying all three gives us the strongest data — and shows you the full comparison. It only takes a minute.</p>
             <div className="modalActions">
-              <button className="modalBtnPrimary" onClick={() => onGoToMissing(missingMode)}>
-                Try {missingMode} →
-              </button>
-              <button className="modalBtnSecondary" onClick={onGoToSurvey}>
-                Skip to survey
-              </button>
+              <button className="modalBtnPrimary" onClick={() => onGoToMissing(missingMode)}>Try {missingMode} →</button>
+              <button className="modalBtnSecondary" onClick={onGoToSurvey}>Skip to survey</button>
             </div>
           </>
         )}
@@ -107,7 +116,7 @@ function Modal({ type, onClose, onGoToSurvey, onGoToMissing, missingMode }: Moda
   );
 }
 
-// ─── Loading spinner ─────────────────────────────────────────────────────────
+// ─── Loading spinner ──────────────────────────────────────────────────────────
 function Loading() {
   return (
     <div className="loadingOverlay">
@@ -287,16 +296,15 @@ interface PanelProps {
   onComplete:       (result: ModeResult) => void;
   username:         string;
   onUsernameChange: (v: string) => void;
-  onRegistering:    (v: boolean) => void;
+  onLoading:        (v: boolean) => void;
 }
 
-function PasscodePanel({ mode, accent, renderPad, onReset, onComplete, username, onUsernameChange, onRegistering }: PanelProps) {
-  const [authTab,     setAuthTab]     = useState<"register" | "login">("register");
-  const [sequence,    setSequence]    = useState<string[]>([]);
-  const [status,      setStatus]      = useState<null | "success" | "fail" | "registered" | "exists" | "notfound">(null);
-  const [errors,      setErrors]      = useState(0);
-  const [registering, setRegistering] = useState(false);
-  const firstKeyTime                   = useRef<number | null>(null);
+function PasscodePanel({ mode, accent, renderPad, onReset, onComplete, username, onUsernameChange, onLoading }: PanelProps) {
+  const [authTab,  setAuthTab]  = useState<"register" | "login">("register");
+  const [sequence, setSequence] = useState<string[]>([]);
+  const [status,   setStatus]   = useState<null | "success" | "fail" | "registered" | "exists" | "notfound" | "error">(null);
+  const [errors,   setErrors]   = useState(0);
+  const firstKeyTime             = useRef<number | null>(null);
 
   const usernameValid = STUDENT_ID_REGEX.test(username);
   const atLimit       = sequence.length >= MAX_PASSWORD_LENGTH;
@@ -310,36 +318,45 @@ function PasscodePanel({ mode, accent, renderPad, onReset, onComplete, username,
 
   const handleBackspace = () => { setStatus(null); setSequence(prev => prev.slice(0, -1)); };
 
-  const handleReset = () => {
-    setSequence([]); setStatus(null); firstKeyTime.current = null; onReset?.();
-  };
+  const handleReset = () => { setSequence([]); setStatus(null); firstKeyTime.current = null; onReset?.(); };
 
   const handleSwitchTab = (t: "register" | "login") => {
     setAuthTab(t); setSequence([]); setStatus(null); firstKeyTime.current = null;
   };
 
-  const handleAction = () => {
+  const handleAction = async () => {
     if (!usernameValid || sequence.length === 0) return;
-    const key = `${username.toLowerCase()}_${mode}`;
+    const password = sequenceToString(sequence);
+
+    onLoading(true);
 
     if (authTab === "register") {
-      if (userStore[key]) { setStatus("exists"); return; }
-      userStore[key] = { password: sequence };
-      setRegistering(true);
-      onRegistering(true);
-      setTimeout(() => { setRegistering(false); onRegistering(false); setStatus(null); setSequence([]); setAuthTab("login"); firstKeyTime.current = null; onReset?.(); }, 1000);
+      const result = await apiRegister(username, mode, password);
+      onLoading(false);
+      if (result.ok) {
+        setStatus("registered");
+        setTimeout(() => { setStatus(null); setSequence([]); setAuthTab("login"); firstKeyTime.current = null; onReset?.(); }, 200);
+      } else if (result.error?.includes("Already registered")) {
+        setStatus("exists");
+      } else {
+        setStatus("error");
+      }
     } else {
-      const user = userStore[key];
-      if (!user) { setStatus("notfound"); return; }
-      const match = user.password.length === sequence.length && user.password.every((v, i) => v === sequence[i]);
-      if (match) {
-        const loginTimeMs = firstKeyTime.current ? Date.now() - firstKeyTime.current : 0;
+      // Start timing from first keypress, but if they came back after refresh
+      // firstKeyTime may be null — start it now
+      if (firstKeyTime.current === null) firstKeyTime.current = Date.now();
+      const result = await apiLogin(username, mode, password);
+      onLoading(false);
+      if (result.ok) {
+        const loginTimeMs = Date.now() - firstKeyTime.current!;
         setStatus("success");
         setTimeout(() => {
           setStatus(null); setSequence([]); firstKeyTime.current = null; onReset?.();
           onComplete({ mode, loginTimeMs, errorCount: errors });
           setErrors(0);
         }, 200);
+      } else if (result.error?.includes("Not registered")) {
+        setStatus("notfound");
       } else {
         setErrors(e => e + 1);
         setStatus("fail");
@@ -390,23 +407,24 @@ function PasscodePanel({ mode, accent, renderPad, onReset, onComplete, username,
       {status === "registered" && <div className="toast toastSuccess">✓ Registered! Switching to login…</div>}
       {status === "success"    && <div className="toast toastSuccess">✓ Login successful!</div>}
       {status === "fail"       && <div className="toast toastFail">✕ Passcode mismatch — try again</div>}
-      {status === "exists"     && <div className="toast toastFail">✕ Student ID already registered for this mode</div>}
+      {status === "exists"     && <div className="toast toastFail">✕ Already registered — switch to Login</div>}
       {status === "notfound"   && <div className="toast toastFail">✕ Not found — register first</div>}
+      {status === "error"      && <div className="toast toastFail">✕ Something went wrong — try again</div>}
     </div>
   );
 }
 
 // ─── Mode wrappers ────────────────────────────────────────────────────────────
-function NumberMode({ onComplete, username, onUsernameChange, onRegistering }: { onComplete: (r: ModeResult) => void; username: string; onUsernameChange: (v: string) => void; onRegistering: (v: boolean) => void }) {
-  return <PasscodePanel mode="number" accent="#2563eb" username={username} onUsernameChange={onUsernameChange} onComplete={onComplete} onRegistering={onRegistering} renderPad={(onPress) => <NumberPad onPress={onPress} />} />;
+function NumberMode({ onComplete, username, onUsernameChange, onLoading }: { onComplete: (r: ModeResult) => void; username: string; onUsernameChange: (v: string) => void; onLoading: (v: boolean) => void }) {
+  return <PasscodePanel mode="number" accent="#2563eb" username={username} onUsernameChange={onUsernameChange} onComplete={onComplete} onLoading={onLoading} renderPad={(onPress) => <NumberPad onPress={onPress} />} />;
 }
-function EmojiMode({ onComplete, username, onUsernameChange, onRegistering }: { onComplete: (r: ModeResult) => void; username: string; onUsernameChange: (v: string) => void; onRegistering: (v: boolean) => void }) {
+function EmojiMode({ onComplete, username, onUsernameChange, onLoading }: { onComplete: (r: ModeResult) => void; username: string; onUsernameChange: (v: string) => void; onLoading: (v: boolean) => void }) {
   const [pool, setPool] = useState<string[]>(() => shuffle(EMOJI_POOL_12));
-  return <PasscodePanel mode="emoji" accent="#db2777" username={username} onUsernameChange={onUsernameChange} onComplete={onComplete} onRegistering={onRegistering} onReset={() => setPool(shuffle(EMOJI_POOL_12))} renderPad={(onPress) => <EmojiGridDisplay pool={pool} onPress={onPress} disabled={false} />} />;
+  return <PasscodePanel mode="emoji" accent="#db2777" username={username} onUsernameChange={onUsernameChange} onComplete={onComplete} onLoading={onLoading} onReset={() => setPool(shuffle(EMOJI_POOL_12))} renderPad={(onPress) => <EmojiGridDisplay pool={pool} onPress={onPress} disabled={false} />} />;
 }
-function MixedMode({ onComplete, username, onUsernameChange, onRegistering }: { onComplete: (r: ModeResult) => void; username: string; onUsernameChange: (v: string) => void; onRegistering: (v: boolean) => void }) {
+function MixedMode({ onComplete, username, onUsernameChange, onLoading }: { onComplete: (r: ModeResult) => void; username: string; onUsernameChange: (v: string) => void; onLoading: (v: boolean) => void }) {
   const [emojiPool, setEmojiPool] = useState<string[]>(() => shuffle(MIXED_EMOJI_6));
-  return <PasscodePanel mode="mixed" accent="#7c3aed" username={username} onUsernameChange={onUsernameChange} onComplete={onComplete} onRegistering={onRegistering} onReset={() => setEmojiPool(shuffle(MIXED_EMOJI_6))} renderPad={(onPress) => <MixedGrid numPool={[...NUMBER_POOL]} emojiPool={emojiPool} onPress={onPress} />} />;
+  return <PasscodePanel mode="mixed" accent="#7c3aed" username={username} onUsernameChange={onUsernameChange} onComplete={onComplete} onLoading={onLoading} onReset={() => setEmojiPool(shuffle(MIXED_EMOJI_6))} renderPad={(onPress) => <MixedGrid numPool={[...NUMBER_POOL]} emojiPool={emojiPool} onPress={onPress} />} />;
 }
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
@@ -426,11 +444,10 @@ export default function Home() {
   const [showSurvey,     setShowSurvey]     = useState(false);
   const [modal,          setModal]          = useState<ModalType>(null);
   const [missingMode,    setMissingMode]    = useState<"emoji" | "mixed" | null>(null);
-  const [saving,         setSaving]         = useState(false);
-  const [registering,    setRegistering]    = useState(false);
+  const [loading,        setLoading]        = useState(false);
 
   const handleComplete = async (result: ModeResult) => {
-    setSaving(true);
+    setLoading(true);
     const newResults   = [...results, result];
     const newCompleted = new Set([...completedModes, result.mode as TabId]);
     setResults(newResults);
@@ -438,45 +455,29 @@ export default function Home() {
 
     try { await saveResult(username, result); }
     catch (err) { console.error("Failed to save result:", err); }
-    finally { setSaving(false); }
+    finally { setLoading(false); }
 
     if (result.mode === "number") {
-      // Unlock emoji tabs and show unlocked modal
       setUnlockedTabs(new Set(["number", "emoji", "mixed"]));
       setTimeout(() => setModal("unlocked"), 200);
       return;
     }
 
-    // After completing an emoji mode, check what's missing
     const hasEmoji = newCompleted.has("emoji");
     const hasMixed = newCompleted.has("mixed");
 
     if (hasEmoji && hasMixed) {
-      // All three done — go straight to survey
       setTimeout(() => setShowSurvey(true), 200);
     } else {
-      // One emoji mode done — nudge toward the other, but let them skip
       const missing = hasEmoji ? "mixed" : "emoji";
       setMissingMode(missing);
       setTimeout(() => setModal("nudge"), 200);
     }
   };
 
-  const handleGoToSurvey = () => {
-    setModal(null);
-    setShowSurvey(true);
-  };
-
-  const handleGoToMissing = (tab: "emoji" | "mixed") => {
-    setModal(null);
-    setTab(tab);
-  };
-
-  const handleCloseModal = () => {
-    setModal(null);
-    // After unlocked modal, switch to emoji tab automatically
-    if (modal === "unlocked") setTab("emoji");
-  };
+  const handleGoToSurvey  = () => { setModal(null); setShowSurvey(true); };
+  const handleGoToMissing = (t: "emoji" | "mixed") => { setModal(null); setTab(t); };
+  const handleCloseModal  = () => { setModal(null); if (modal === "unlocked") setTab("emoji"); };
 
   if (showSurvey) {
     return (
@@ -494,8 +495,7 @@ export default function Home() {
 
   return (
     <main className="main">
-      {/* Modal */}
-      {(saving || registering) && <Loading />}
+      {loading && <Loading />}
       <Modal
         type={modal}
         onClose={handleCloseModal}
@@ -544,9 +544,9 @@ export default function Home() {
       </div>
 
       <div className="tabBody" key={tab}>
-        {tab === "number" && <NumberMode onComplete={handleComplete} username={username} onUsernameChange={setUsername} onRegistering={setRegistering} />}
-        {tab === "emoji"  && <EmojiMode  onComplete={handleComplete} username={username} onUsernameChange={setUsername} onRegistering={setRegistering} />}
-        {tab === "mixed"  && <MixedMode  onComplete={handleComplete} username={username} onUsernameChange={setUsername} onRegistering={setRegistering} />}
+        {tab === "number" && <NumberMode onComplete={handleComplete} username={username} onUsernameChange={setUsername} onLoading={setLoading} />}
+        {tab === "emoji"  && <EmojiMode  onComplete={handleComplete} username={username} onUsernameChange={setUsername} onLoading={setLoading} />}
+        {tab === "mixed"  && <MixedMode  onComplete={handleComplete} username={username} onUsernameChange={setUsername} onLoading={setLoading} />}
       </div>
     </main>
   );
