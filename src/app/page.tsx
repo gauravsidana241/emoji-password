@@ -397,16 +397,16 @@ function PasscodePanel({ mode, accent, renderPad, onReset, onComplete, username,
 }
 
 // ─── Mode wrappers ────────────────────────────────────────────────────────────
-function NumberMode({ onComplete, username, onUsernameChange }: { onComplete: (r: ModeResult) => void; username: string; onUsernameChange: (v: string) => void }) {
-  return <PasscodePanel mode="number" accent="#2563eb" username={username} onUsernameChange={onUsernameChange} onComplete={onComplete} renderPad={(onPress) => <NumberPad onPress={onPress} />} />;
+function NumberMode({ onComplete, username, onUsernameChange, onRegistering }: { onComplete: (r: ModeResult) => void; username: string; onUsernameChange: (v: string) => void; onRegistering: (v: boolean) => void }) {
+  return <PasscodePanel mode="number" accent="#2563eb" username={username} onUsernameChange={onUsernameChange} onComplete={onComplete} onRegistering={onRegistering} renderPad={(onPress) => <NumberPad onPress={onPress} />} />;
 }
-function EmojiMode({ onComplete, username, onUsernameChange }: { onComplete: (r: ModeResult) => void; username: string; onUsernameChange: (v: string) => void }) {
+function EmojiMode({ onComplete, username, onUsernameChange, onRegistering }: { onComplete: (r: ModeResult) => void; username: string; onUsernameChange: (v: string) => void; onRegistering: (v: boolean) => void }) {
   const [pool, setPool] = useState<string[]>(() => shuffle(EMOJI_POOL_12));
-  return <PasscodePanel mode="emoji" accent="#db2777" username={username} onUsernameChange={onUsernameChange} onComplete={onComplete} onReset={() => setPool(shuffle(EMOJI_POOL_12))} renderPad={(onPress) => <EmojiGridDisplay pool={pool} onPress={onPress} disabled={false} />} />;
+  return <PasscodePanel mode="emoji" accent="#db2777" username={username} onUsernameChange={onUsernameChange} onComplete={onComplete} onRegistering={onRegistering} onReset={() => setPool(shuffle(EMOJI_POOL_12))} renderPad={(onPress) => <EmojiGridDisplay pool={pool} onPress={onPress} disabled={false} />} />;
 }
-function MixedMode({ onComplete, username, onUsernameChange }: { onComplete: (r: ModeResult) => void; username: string; onUsernameChange: (v: string) => void }) {
+function MixedMode({ onComplete, username, onUsernameChange, onRegistering }: { onComplete: (r: ModeResult) => void; username: string; onUsernameChange: (v: string) => void; onRegistering: (v: boolean) => void }) {
   const [emojiPool, setEmojiPool] = useState<string[]>(() => shuffle(MIXED_EMOJI_6));
-  return <PasscodePanel mode="mixed" accent="#7c3aed" username={username} onUsernameChange={onUsernameChange} onComplete={onComplete} onReset={() => setEmojiPool(shuffle(MIXED_EMOJI_6))} renderPad={(onPress) => <MixedGrid numPool={[...NUMBER_POOL]} emojiPool={emojiPool} onPress={onPress} />} />;
+  return <PasscodePanel mode="mixed" accent="#7c3aed" username={username} onUsernameChange={onUsernameChange} onComplete={onComplete} onRegistering={onRegistering} onReset={() => setEmojiPool(shuffle(MIXED_EMOJI_6))} renderPad={(onPress) => <MixedGrid numPool={[...NUMBER_POOL]} emojiPool={emojiPool} onPress={onPress} />} />;
 }
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
